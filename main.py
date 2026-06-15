@@ -17,27 +17,40 @@ client = OpenAI(base_url="http://localhost:8000/v1", api_key="local")
 
 
 def speech_to_text():
-
     recognizer = sr.Recognizer()
-
-    """ recording the sound """
+    recognizer.dynamic_energy_threshold = True
+    recognizer.pause_threshold = 0.8
 
     with sr.Microphone() as source:
-        print("Adjusting noise ")
+        print("Adjusting noise")
         recognizer.adjust_for_ambient_noise(source, duration=1)
-        print("Recording for 4 seconds")
-        recorded_audio = recognizer.listen(source, timeout=4)
-        print("Done recording")
 
-    """ Recorgnizing the Audio """
+        print("Recording")
+        audio = recognizer.listen(source, timeout=4)
+
     try:
-        print("Recognizing the text")
-        text = recognizer.recognize_google(recorded_audio, language="en-US")  # pyright: ignore[reportAttributeAccessIssue]
-        print("Decoded Text : {}".format(text))
-        return text
+        text = recognizer.recognize_google(audio)  # pyright: ignore[]
+        return {"ok": True, "text": text}
 
-    except Exception as ex:
-        print(ex)
+    except sr.UnknownValueError:
+        return {"ok": False, "text": None, "error": "understood_none"}
+
+    except sr.RequestError as e:
+        return {"ok": False, "text": None, "error": "service_down", "detail": str(e)}
+
+
+# handle errors in-character
+def handle_speech_error(error_type):
+    if error_type == "understood_none":
+        error_lines = [
+            "How unfortunate… I did not hear that clearly, Master.",
+            "My hearing seems to be failing you at the worst possible moment.",
+            "I require a repeat, Master. Preferably in a more intelligible form.",
+        ]
+        return error_lines
+    if error_type == "service_down":
+        return "The communication line to the speech service seems unstable, Master."
+    return "An unexpected issue occured, Master."
 
 
 # accepting LLM inputs
@@ -103,14 +116,31 @@ def ai_chat(user_speech_text):
 
 
 # voice output function
+engine = pyttsx3.init()
+
+
 def speak_text(text_in):
-    engine = pyttsx3.init()
+
     engine.say(text_in)
     engine.runAndWait()
 
 
-# Run the program
-output_of_speech = speech_to_text()
-response = ai_chat(output_of_speech)
-print(response)
-speak_text(response)
+# Running the main loop
+while True:
+    result = speech_to_text()
+
+    if not result["ok"]:
+        response = handle_speech_error(result["error"])
+        print(response)
+        speak_text(response)
+        continue
+
+    user_text = result["text"]
+
+    if user_text.lower() in ["exit", "quit", "stop"]:
+        speak_text("Very well, Master. I will stand down.")
+        break
+
+    response = ai_chat(user_text)
+    print(response)
+    speak_text(response)
