@@ -41,7 +41,7 @@ def speech_to_text():
 
 
 # accepting LLM inputs
-#
+# JINORA = Joint Intelligence Network for Observation, Reasoning, and Assistance
 
 
 def ai_chat(user_speech_text):
