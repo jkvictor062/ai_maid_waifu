@@ -1,6 +1,6 @@
 # Convert voice to text
 # Save text and input into llm
-# Covert return text to voice
+# Covert out out text to voice
 # Repeat as needed
 
 import os
