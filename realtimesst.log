@@ -1,0 +1,167 @@
+2026-06-12 23:28:45.839 - RealTimeSTT: realtimestt - INFO - Starting RealTimeSTT
+2026-06-12 23:28:45.844 - RealTimeSTT: realtimestt - INFO - Initializing audio recording (creating pyAudio input stream, sample rate: 16000 buffer size: 512
+2026-06-12 23:28:45.847 - RealTimeSTT: realtimestt - INFO - Initializing WebRTC voice with Sensitivity 3
+2026-06-12 23:28:45.848 - RealTimeSTT: realtimestt - DEBUG - WebRTC VAD voice activity detection engine initialized successfully
+2026-06-12 23:28:45.848 - RealTimeSTT: realtimestt - DEBUG - Silero VAD auto backend raw_onnx_ifless unavailable
+Traceback (most recent call last):
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 176, in _create_auto_vad
+    return _create_raw_onnx_vad(
+        model_name,
+    ...<4 lines>...
+        chunk_samples,
+    )
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 225, in _create_raw_onnx_vad
+    raise SileroVadError(
+    ...<3 lines>...
+    )
+RealtimeSTT.core.silero_vad.SileroVadError: Could not find silero_vad_op18_ifless.onnx in the installed silero_vad package or the local torch hub cache. Install 'silero-vad' or pass silero_onnx_model_path.
+2026-06-12 23:28:45.850 - RealTimeSTT: realtimestt - DEBUG - Silero VAD auto backend raw_onnx unavailable
+Traceback (most recent call last):
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 176, in _create_auto_vad
+    return _create_raw_onnx_vad(
+        model_name,
+    ...<4 lines>...
+        chunk_samples,
+    )
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 225, in _create_raw_onnx_vad
+    raise SileroVadError(
+    ...<3 lines>...
+    )
+RealtimeSTT.core.silero_vad.SileroVadError: Could not find silero_vad.onnx in the installed silero_vad package or the local torch hub cache. Install 'silero-vad' or pass silero_onnx_model_path.
+2026-06-12 23:28:46.093 - RealTimeSTT: realtimestt - ERROR - Error initializing Silero VAD voice activity detection engine: Could not initialize any automatic Silero VAD backend. Tried: raw_onnx_ifless: Could not find silero_vad_op18_ifless.onnx in the installed silero_vad package or the local torch hub cache. Install 'silero-vad' or pass silero_onnx_model_path.; raw_onnx: Could not find silero_vad.onnx in the installed silero_vad package or the local torch hub cache. Install 'silero-vad' or pass silero_onnx_model_path.; pytorch_cpu: It looks like there is no internet connection and the repo could not be found in the cache (/Users/jerredvictor/.cache/torch/hub)
+Traceback (most recent call last):
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 287, in _create_pytorch_vad
+    loaded = _load_silero_package_model(onnx=False)
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 303, in _load_silero_package_model
+    module = import_module("silero_vad")
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/importlib/__init__.py", line 88, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1398, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1371, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1335, in _find_and_load_unlocked
+ModuleNotFoundError: No module named 'silero_vad'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py", line 1321, in do_open
+    h.request(req.get_method(), req.selector, req.data, headers,
+    ~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+              encode_chunked=req.has_header('Transfer-encoding'))
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1338, in request
+    self._send_request(method, url, body, headers, encode_chunked)
+    ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1384, in _send_request
+    self.endheaders(body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1333, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1093, in _send_output
+    self.send(msg)
+    ~~~~~~~~~^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1037, in send
+    self.connect()
+    ~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/http/client.py", line 1479, in connect
+    self.sock = self._context.wrap_socket(self.sock,
+                ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^
+                                          server_hostname=server_hostname)
+                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/ssl.py", line 455, in wrap_socket
+    return self.sslsocket_class._create(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sock=sock,
+        ^^^^^^^^^^
+    ...<5 lines>...
+        session=session
+        ^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/ssl.py", line 1076, in _create
+    self.do_handshake()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/ssl.py", line 1372, in do_handshake
+    self._sslobj.do_handshake()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1077)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/torch/hub.py", line 206, in _parse_repo_info
+    with urlopen(f"https://github.com/{repo_owner}/{repo_name}/tree/main/"):
+         ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py", line 187, in urlopen
+    return opener.open(url, data, timeout)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py", line 487, in open
+    response = self._open(req, data)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py", line 504, in _open
+    result = self._call_chain(self.handle_open, protocol, protocol +
+                              '_open', req)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py", line 464, in _call_chain
+    result = func(*args)
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py", line 1369, in https_open
+    return self.do_open(http.client.HTTPSConnection, req,
+           ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+                        context=self._context)
+                        ^^^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/urllib/request.py", line 1324, in do_open
+    raise URLError(err)
+urllib.error.URLError: <urlopen error [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1077)>
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 195, in _create_auto_vad
+    return _create_pytorch_vad("cpu")
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 289, in _create_pytorch_vad
+    loaded = _load_torch_hub_model(onnx=False)
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 319, in _load_torch_hub_model
+    loaded = torch.hub.load(
+        repo_or_dir="snakers4/silero-vad",
+    ...<2 lines>...
+        onnx=onnx,
+    )
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/torch/hub.py", line 661, in load
+    repo_or_dir = _get_cache_or_reload(
+        repo_or_dir,
+    ...<3 lines>...
+        skip_validation=skip_validation,
+    )
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/torch/hub.py", line 278, in _get_cache_or_reload
+    repo_owner, repo_name, ref = _parse_repo_info(github)
+                                 ~~~~~~~~~~~~~~~~^^^^^^^^
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/torch/hub.py", line 222, in _parse_repo_info
+    raise RuntimeError(
+    ...<2 lines>...
+    ) from e
+RuntimeError: It looks like there is no internet connection and the repo could not be found in the cache (/Users/jerredvictor/.cache/torch/hub)
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/initialization.py", line 558, in _initialize_voice_activity_detection
+    recorder.silero_vad_model = create_silero_vad_model(
+                                ~~~~~~~~~~~~~~~~~~~~~~~^
+        backend=silero_backend,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<5 lines>...
+        logger=logger,
+        ^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 114, in create_silero_vad_model
+    return _create_auto_vad(
+        onnx_model_path=onnx_model_path,
+    ...<3 lines>...
+        logger=log,
+    )
+  File "/Users/jerredvictor/aiwaifu/.venv/lib/python3.14/site-packages/RealtimeSTT/core/silero_vad.py", line 198, in _create_auto_vad
+    raise SileroVadError(
+    ...<2 lines>...
+    )
+RealtimeSTT.core.silero_vad.SileroVadError: Could not initialize any automatic Silero VAD backend. Tried: raw_onnx_ifless: Could not find silero_vad_op18_ifless.onnx in the installed silero_vad package or the local torch hub cache. Install 'silero-vad' or pass silero_onnx_model_path.; raw_onnx: Could not find silero_vad.onnx in the installed silero_vad package or the local torch hub cache. Install 'silero-vad' or pass silero_onnx_model_path.; pytorch_cpu: It looks like there is no internet connection and the repo could not be found in the cache (/Users/jerredvictor/.cache/torch/hub)
