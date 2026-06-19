@@ -1,14 +1,6 @@
 [
   {
     "role": "user",
-    "content": "hello hello hello hello hello hello hello"
-  },
-  {
-    "role": "assistant",
-    "content": "**I raise my voice with a playful tone.** \"Hello indeed! It seems you're in a hurry, are you? Perhaps we should have a chat over coffee, or perhaps some tea? It's a good thing you asked, isn't it?\""
-  },
-  {
-    "role": "user",
     "content": "stop stop"
   },
   {
@@ -158,5 +150,13 @@
   {
     "role": "assistant",
     "content": "**I raise my voice with a playful tone.** \"Hello, Master. I am doing well, thank you. How about you? Is there something specific you would like to discuss?\""
+  },
+  {
+    "role": "user",
+    "content": "hello hello hello hello"
+  },
+  {
+    "role": "assistant",
+    "content": "**I raise my voice with a playful tone.** \"Hello, Master. It seems you're in a hurry, are you? Perhaps we can have a quiet moment and discuss what's important.\""
   }
 ]
