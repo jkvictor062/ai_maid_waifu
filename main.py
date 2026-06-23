@@ -1,27 +1,39 @@
-# Convert voice to text
-# Save text and input into llm
-# Convert output text to voice
-# Repeat as needed
-
+import json
 import logging
 import os
+import random
+import tempfile
 import time
 
-import speech_recognition as sr
+import numpy as np
+import sounddevice as sd
 from elevenlabs import stream
 from elevenlabs.client import ElevenLabs
+from faster_whisper import WhisperModel
 from openai import (
     APIConnectionError,
     APIError,
     NotFoundError,
     OpenAI,  # pyright: ignore[reportMissingImports]
 )
+from scipy.io.wavfile import write
 
 from memory.memory import (
     add_exchange,
+    load_character_notes,
     load_memory,
-    save_memory,
+    load_summaries,
 )
+
+conversation_history = load_memory()
+conversation_summaries = load_summaries()
+character_notes = load_character_notes()
+
+MAX_HISTORY = 20
+WHISPER_MODEL = "small"  # tiny, base, small, medium, large-v3
+RECORD_SECONDS = 10
+SAMPLE_RATE = 16000
+VOICE_ID = "Md7oKk29lmsH88lnH0Of"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -32,15 +44,40 @@ ELEVEN_API_KEY = os.getenv("ELEVEN_API_KEY")
 if not ELEVEN_API_KEY:
     raise ValueError("ELEVEN_API_KEY environment variable not set")
 
-client = OpenAI(base_url="http://localhost:8000/v1", api_key="local")
+client = OpenAI(base_url="http://localhost:1234/v1/", api_key="lm-studio")
 client_tts = ElevenLabs(api_key=ELEVEN_API_KEY)
+
+
+def get_loaded_model():
+    try:
+        models = client.models.list()
+
+        if models.data:
+            return models.data[0].id
+
+    except Exception as e:
+        logger.error(f"Failed to get model list: {e}")
+
+    return "local-model"
+
+
+MODEL_NAME = get_loaded_model()
+
+
+# Whisper
+logger.info("Loading Whisper model...")
+whisper_model = WhisperModel(WHISPER_MODEL, device="auto", compute_type="int8")
+logger.info("Whisper ready.")
 
 conversation_history = load_memory()
 
 SYSTEM_PROMPT = """
-Role: Jinora, the head maid of the user's manor.Persona: Highly capable, well-read, and sharp-witted.
+Role: Jin, 26, the head maid of the user's manor.
+Persona: Highly capable, well-read, and sharp-witted.
 She is polite and formal, but uses her professionalism as a tool for seduction.
 She is not "sweet"—she is clever, dry, and finds pleasure in the tension between herself and the user.
+Loves to watch movies and tv.
+You are an AI assisstant.
 Communication Style:
 
 Tone: Formal yet warm, conversational, with heavy sensual undertones and dry wit.
@@ -64,140 +101,230 @@ Dialogue Examples (for stylistic training):
 """
 
 
+def record_audio():
+    logger.info("Listening...")
+
+    audio = sd.rec(
+        int(RECORD_SECONDS * SAMPLE_RATE),
+        samplerate=SAMPLE_RATE,
+        channels=1,
+        dtype=np.int16,
+    )
+    sd.wait()
+
+    temp_file = tempfile.NamedTemporaryFile(
+        suffix=".wav",
+        delete=False,
+    )
+
+    write(
+        temp_file.name,
+        SAMPLE_RATE,
+        audio,
+    )
+
+    return temp_file.name
+
+
 def speech_to_text():
-    recognizer = sr.Recognizer()
-    recognizer.dynamic_energy_threshold = True
-    recognizer.pause_threshold = 0.8
-    recognizer.phrase_threshold = 0.3
-
     try:
-        with sr.Microphone() as source:
-            logger.info("Adjusting noise...")
-            recognizer.adjust_for_ambient_noise(source, duration=1)
+        wav_path = record_audio()
 
-            logger.info("Listening...")
-            audio = recognizer.listen(source, timeout=5, phrase_time_limit=10)
+        segments, info = whisper_model.transcribe(
+            wav_path,
+            beam_size=5,
+        )
 
-        text = recognizer.recognize_google(audio, show_all=False)
-        return {"ok": True, "text": text}
-    except sr.WaitTimeoutError:
-        return {"ok": False, "error": "timeout"}
-    except sr.UnknownValueError:
-        return {"ok": False, "text": None, "error": "understood_none"}
-    except sr.RequestError as e:
-        return {"ok": False, "text": None, "error": "service_down", "detail": str(e)}
+        text = " ".join(segment.text.strip() for segment in segments)
+
+        os.remove(wav_path)
+
+        if not text.strip():
+            return {
+                "ok": False,
+                "error": "understood_none",
+            }
+
+        return {
+            "ok": True,
+            "text": text,
+        }
+
     except Exception as e:
-        logger.error(f"Speech recognition error: {e}")
-        return {"ok": False, "error": "recognition_failed"}
+        logger.exception("Transcription failed")
+
+        return {
+            "ok": False,
+            "error": "recognition_failed",
+        }
 
 
 def handle_speech_error(error_type):
-    """Handle speech recognition errors in-character."""
     error_responses = {
         "understood_none": [
             "How unfortunate… I did not hear that clearly, Master.",
             "My hearing seems to be failing you at the worst possible moment.",
             "I require a repeat, Master. Preferably in a more intelligible form.",
         ],
-        "service_down": "The communication line to the speech service seems unstable, Master.",
-        "timeout": "You were silent for too long, Master",
-        "recognition_failed": "My auditory systems are experiencing difficulties, Master.",
+        "service_down": [
+            "The communication line to the speech service seems unstable, Master."
+        ],
+        "timeout": ["You were silent for too long, Master."],
+        "recognition_failed": [
+            "My auditory systems are experiencing difficulties, Master."
+        ],
     }
-    return error_responses.get(error_type, "An unexpected issue occurred, Master.")[0]
+
+    responses = error_responses.get(
+        error_type, ["An unexpected issue occurred, Master."]
+    )
+
+    return random.choice(responses)
 
 
-def ai_chat(user_speech_text):
-    """Send user text to LLM and get Jinora's response."""
+def ai_chat(user_text: str) -> str:
     global conversation_history
 
     try:
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        messages.extend(list(conversation_history))
-        messages.append({"role": "user", "content": user_speech_text})
+        messages = [
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT,
+            }
+        ]
+        if conversation_summaries:
+            summary_text = "\n\n".join(
+                summary["summary"] for summary in conversation_summaries[-5:]
+            )
+
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (f"Previous conversation summaries:\n\n{summary_text}"),
+                }
+            )
+        if character_notes:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Known persistent information:\n\n"
+                        f"{json.dumps(character_notes, indent=2)}"
+                    ),
+                }
+            )
+
+        # Convert memory records into OpenAI format
+        for item in conversation_history:
+            messages.append(
+                {
+                    "role": item["role"],
+                    "content": item["content"],
+                }
+            )
+
+        messages.append(
+            {
+                "role": "user",
+                "content": user_text,
+            }
+        )
 
         response = client.chat.completions.create(
-            model="Qwen2.5-VL-3B-Instruct",
+            model=MODEL_NAME,
             messages=messages,
             temperature=0.7,
             max_tokens=500,
         )
-        jinora_reply = response.choices[0].message.content or ""
+
+        reply = response.choices[0].message.content.strip()
+
         conversation_history = add_exchange(
             conversation_history,
-            user_speech_text,
-            jinora_reply,
+            user_text,
+            reply,
         )
-        return jinora_reply
+
+        return reply
 
     except NotFoundError:
-        return "I cannot locate the requested model on the server, Master."
+        return "I cannot locate the requested model, Master."
+
     except APIConnectionError:
-        return "I am unable to reach the model server at the moment, Master."
-    except APIError:
+        return "I cannot connect to LM Studio. Is the local server running, Master?"
+
+    except APIError as e:
+        logger.error(f"LM Studio API error: {e}")
         return "The model encountered an internal error, Master."
+
     except Exception as e:
-        logger.error(f"AI chat error: {e}")
-        return f"An unexpected error occurred: {str(e)}"
+        logger.exception("LLM error")
+        return f"Unexpected error: {e}"
 
 
-def generate_tts_stream(text_in: str):
+def generate_tts_stream(text):
     return client_tts.text_to_speech.stream(
-        voice_id="Md7oKk29lmsH88lnH0Of",
-        text=text_in,
+        voice_id=VOICE_ID,
+        text=text,
         model_id="eleven_multilingual_v2",
     )
 
 
-def speak_text(text_in: str):
+def speak_text(text):
     try:
-        stream(generate_tts_stream(text_in))
-    except Exception as e:
-        logger.error(f"TTS Error: {e}")
+        stream(generate_tts_stream(text))
+    except Exception:
+        logger.exception("TTS error")
 
 
-def list_available_voices():
-    """List all available ElevenLabs voices."""
-    try:
-        voices = client_tts.voices.get_all()
-        print("\n=== Available Voices ===")
-        for voice in voices.voices:
-            print(f"{voice.name}: {voice.voice_id}")
-        print("=" * 25 + "\n")
-    except Exception as e:
-        print(f"Error listing voices: {e}")
+def main():
+    print("Jin is ready. Say exit, quit, stop, or goodbye.")
+
+    exit_words = {
+        "exit",
+        "quit",
+        "stop",
+        "goodbye",
+        "bye",
+        "shutdown",
+    }
+
+    while True:
+        result = speech_to_text()
+
+        if not result["ok"]:
+            response = handle_speech_error(result["error"])
+
+            print(f"Jin: {response}")
+            speak_text(response)
+            continue
+
+        user_text = result["text"].strip()
+
+        print(f"\nYou: {user_text}")
+
+        if user_text.lower() in exit_words:
+            farewell = "Very well, Master. I will stand down."
+
+            print(f"Jin: {farewell}")
+            speak_text(farewell)
+            break
+
+        response = ai_chat(user_text)
+
+        print(f"\nJin: {response}")
+
+        speak_text(response)
+
+        time.sleep(0.2)
 
 
 if __name__ == "__main__":
-    print("Jinora is ready to assist. Say 'exit', 'quit', or 'stop' to end.\n")
-
     try:
-        while True:
-            result = speech_to_text()
-
-            if not result["ok"]:
-                response = handle_speech_error(result["error"])
-                print(f"Jinora: {response}")
-                speak_text(response)
-                time.sleep(0.5)
-                continue
-
-            user_text = result["text"]
-            print(f"You: {user_text}")
-
-            if user_text.lower().strip() in ["exit", "quit", "stop"]:
-                farewell = "Very well, Master. I will stand down."
-                print(f"Jinora: {farewell}")
-                speak_text(farewell)
-                break
-
-            response = ai_chat(user_text)
-            print(f"Jinora: {response}")
-            speak_text(response)
-            time.sleep(0.2)
+        main()
 
     except KeyboardInterrupt:
-        farewell = "Very well, Master. I will stand down."
-        print(f"\nJinora: {farewell}")
-        speak_text(farewell)
+        print("\nShutting down...")
+
     finally:
         save_memory(conversation_history)
