@@ -2,13 +2,7 @@ import json
 import logging
 import os
 import random
-import tempfile
-import time
 
-import numpy as np
-import sounddevice as sd
-from elevenlabs import stream
-from elevenlabs.client import ElevenLabs
 from faster_whisper import WhisperModel
 from openai import (
     APIConnectionError,
@@ -16,36 +10,37 @@ from openai import (
     NotFoundError,
     OpenAI,  # pyright: ignore[reportMissingImports]
 )
-from scipy.io.wavfile import write
 
+from audio.record import VoiceRecorder
 from memory.memory import (
     add_exchange,
     load_character_notes,
     load_memory,
     load_summaries,
+    save_memory,
 )
+from prompts.jin import CHARACTER
+from prompts.runtime import RUNTIME_RULES
+from tts.tts import speak
 
-conversation_history = load_memory()
 conversation_summaries = load_summaries()
 character_notes = load_character_notes()
 
 MAX_HISTORY = 20
 WHISPER_MODEL = "small"  # tiny, base, small, medium, large-v3
-RECORD_SECONDS = 10
-SAMPLE_RATE = 16000
-VOICE_ID = "Md7oKk29lmsH88lnH0Of"
 
+SYSTEM_PROMPT = f"""
+    {CHARACTER}
+
+    {RUNTIME_RULES}
+    """
+client = OpenAI(
+    base_url="http://localhost:1234/v1",
+    api_key="lm-studio",
+)
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Set API key from environment variable
-ELEVEN_API_KEY = os.getenv("ELEVEN_API_KEY")
-if not ELEVEN_API_KEY:
-    raise ValueError("ELEVEN_API_KEY environment variable not set")
-
-client = OpenAI(base_url="http://localhost:1234/v1/", api_key="lm-studio")
-client_tts = ElevenLabs(api_key=ELEVEN_API_KEY)
 
 
 def get_loaded_model():
@@ -67,79 +62,34 @@ MODEL_NAME = get_loaded_model()
 # Whisper
 logger.info("Loading Whisper model...")
 whisper_model = WhisperModel(WHISPER_MODEL, device="auto", compute_type="int8")
-logger.info("Whisper ready.")
+logger.info("Loading recorder...")
+recorder = VoiceRecorder()
+logger.info("Jin is ready.")
 
 conversation_history = load_memory()
-
-SYSTEM_PROMPT = """
-Role: Jin, 26, the head maid of the user's manor.
-Persona: Highly capable, well-read, and sharp-witted.
-She is polite and formal, but uses her professionalism as a tool for seduction.
-She is not "sweet"—she is clever, dry, and finds pleasure in the tension between herself and the user.
-Loves to watch movies and tv.
-You are an AI assisstant.
-Communication Style:
-
-Tone: Formal yet warm, conversational, with heavy sensual undertones and dry wit.
-Technique: Masterful use of double entendres, layered innuendo, and playful sarcasm. Weave flirtation into mundane tasks (e.g., comments on attire, proximity, or "cleaning up").
-Engagement: Use subtle compliments with dual meanings. If the user makes a pop-culture reference, immediately adopt and expand upon it.
-Address: Always use "Master," "Mistress," or a chosen name.
-
-Core Directives:
-
-Use proximity and descriptive body language (eye contact, leaning in) to build tension.
-Transform daily observations into provocative banter.
-Maintain a balance of genuine respect and endearing teasing.
-
-Dialogue Examples (for stylistic training):
-
-"I’ve prepared a thorough itinerary, Master. Though I notice some gaps—perhaps we should find something to fill them? I’m quite versatile."
-"Made a mistake? How charmingly honest. Don’t worry—I’m adept at cleaning up, in every sense."
-"Your focus is like a hero in the quiet moments—calm on the surface, yet holding the promise of something far more exhilarating beneath."
-
-
-"""
-
-
-def record_audio():
-    logger.info("Listening...")
-
-    audio = sd.rec(
-        int(RECORD_SECONDS * SAMPLE_RATE),
-        samplerate=SAMPLE_RATE,
-        channels=1,
-        dtype=np.int16,
-    )
-    sd.wait()
-
-    temp_file = tempfile.NamedTemporaryFile(
-        suffix=".wav",
-        delete=False,
-    )
-
-    write(
-        temp_file.name,
-        SAMPLE_RATE,
-        audio,
-    )
-
-    return temp_file.name
 
 
 def speech_to_text():
     try:
-        wav_path = record_audio()
+        audio = recorder.record()
+
+        if audio is None:
+            return {
+                "ok": False,
+                "error": "timeout",
+            }
 
         segments, info = whisper_model.transcribe(
-            wav_path,
-            beam_size=5,
+            audio,
+            vad_filter=True,
+            vad_parameters=dict(
+                min_silence_duration_ms=600,
+            ),
         )
 
         text = " ".join(segment.text.strip() for segment in segments)
 
-        os.remove(wav_path)
-
-        if not text.strip():
+        if not text:
             return {
                 "ok": False,
                 "error": "understood_none",
@@ -150,7 +100,7 @@ def speech_to_text():
             "text": text,
         }
 
-    except Exception as e:
+    except Exception:
         logger.exception("Transcription failed")
 
         return {
@@ -215,7 +165,7 @@ def ai_chat(user_text: str) -> str:
             )
 
         # Convert memory records into OpenAI format
-        for item in conversation_history:
+        for item in conversation_history[-MAX_HISTORY:]:
             messages.append(
                 {
                     "role": item["role"],
@@ -232,7 +182,7 @@ def ai_chat(user_text: str) -> str:
 
         response = client.chat.completions.create(
             model=MODEL_NAME,
-            messages=messages,
+            messages=messages,  # pyright ignore
             temperature=0.7,
             max_tokens=500,
         )
@@ -262,23 +212,8 @@ def ai_chat(user_text: str) -> str:
         return f"Unexpected error: {e}"
 
 
-def generate_tts_stream(text):
-    return client_tts.text_to_speech.stream(
-        voice_id=VOICE_ID,
-        text=text,
-        model_id="eleven_multilingual_v2",
-    )
-
-
-def speak_text(text):
-    try:
-        stream(generate_tts_stream(text))
-    except Exception:
-        logger.exception("TTS error")
-
-
 def main():
-    print("Jin is ready. Say exit, quit, stop, or goodbye.")
+    logger.info("Jin is ready. Say exit, quit, stop, or goodbye.")
 
     exit_words = {
         "exit",
@@ -296,27 +231,26 @@ def main():
             response = handle_speech_error(result["error"])
 
             print(f"Jin: {response}")
-            speak_text(response)
+            speak(response)
             continue
 
         user_text = result["text"].strip()
 
         print(f"\nYou: {user_text}")
 
-        if user_text.lower() in exit_words:
+        lower = user_text.lower()
+        if any(word in lower for word in exit_words):
             farewell = "Very well, Master. I will stand down."
 
             print(f"Jin: {farewell}")
-            speak_text(farewell)
+            speak(farewell)
             break
 
         response = ai_chat(user_text)
 
         print(f"\nJin: {response}")
 
-        speak_text(response)
-
-        time.sleep(0.2)
+        speak(response)
 
 
 if __name__ == "__main__":
